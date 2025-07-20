@@ -1,7 +1,7 @@
 import "./App.css";
 import { maxGuesses, seed, urlParam } from "./util";
 import Game from "./Game";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { About } from "./About";
 
 function useSetting<T>(
@@ -47,16 +47,65 @@ function App() {
   );
   const [enterLeft, setEnterLeft] = useSetting<boolean>("enter-left", false);
 
+  const [timerEnabled, setTimerEnabled] = useState(false);
+  const [timerDuration, setTimerDuration] = useState<number | null>(null);
+  const [showDurationPopup, setShowDurationPopup] = useState(false);
+  const [timeLeft, setTimeLeft] = useState<number | null>(null);
+  const timerRef = useRef<NodeJS.Timeout | null>(null);
+
   useEffect(() => {
     document.body.className = dark ? "dark" : "";
     if (urlParam("today") !== null || urlParam("todas") !== null) {
       document.location = "?seed=" + todaySeed;
     }
     setTimeout(() => {
-      // Avoid transition on page load
       document.body.style.transition = "0.3s background-color ease-out";
     }, 1);
   }, [dark]);
+
+  useEffect(() => {
+    if (timerEnabled) {
+      setShowDurationPopup(true);
+    } else {
+      setTimerDuration(null);
+      setTimeLeft(null);
+      if (timerRef.current) clearInterval(timerRef.current);
+    }
+  }, [timerEnabled]);
+
+  useEffect(() => {
+    if (timerDuration) {
+      const durationMs = timerDuration * 60 * 1000;
+      const endTime = Date.now() + durationMs;
+
+      setTimeLeft(durationMs);
+
+      if (timerRef.current) clearInterval(timerRef.current);
+      timerRef.current = setInterval(() => {
+        const remaining = endTime - Date.now();
+        if (remaining <= 0) {
+          setTimeLeft(0);
+          clearInterval(timerRef.current!);
+          alert("⏰ Time's up!");
+          setTimerEnabled(false);
+          setTimerDuration(null);
+        } else {
+          setTimeLeft(remaining);
+        }
+      }, 1000);
+
+      return () => clearInterval(timerRef.current!);
+    }
+  }, [timerDuration]);
+
+  const formatTime = (ms: number) => {
+    const totalSeconds = Math.floor(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60)
+      .toString()
+      .padStart(2, "0");
+    const seconds = (totalSeconds % 60).toString().padStart(2, "0");
+    return `${minutes}:${seconds}`;
+  };
 
   const link = (emoji: string, label: string, page: Page) => (
     <button
@@ -82,6 +131,26 @@ function App() {
         </span>
         o wordl
       </h1>
+
+      {page === "game" && (
+        <div className="inline-toggle">
+          <label className="toggle-switch">
+            <input
+              type="checkbox"
+              checked={timerEnabled}
+              onChange={() => setTimerEnabled((x) => !x)}
+            />
+            <span className="slider" />
+          </label>
+          <span className="toggle-label">Enable Timer</span>
+        </div>
+      )}
+
+      {/* Countdown display */}
+      {timerEnabled && timeLeft !== null && (
+        <div className="countdown-timer">⏳ {formatTime(timeLeft)}</div>
+      )}
+
       <div className="top-right">
         {page !== "game" ? (
           link("❌", "Close", "game")
@@ -137,14 +206,7 @@ function App() {
             <div>
               <label htmlFor="difficulty-setting">Difficulty:</label>
               <strong>{["Normal", "Hard", "Ultra Hard"][difficulty]}</strong>
-              <div
-                style={{
-                  fontSize: 14,
-                  height: 40,
-                  marginLeft: 8,
-                  marginTop: 8,
-                }}
-              >
+              <div className="difficulty-desc">
                 {
                   [
                     `Guesses must be valid dictionary words.`,
@@ -177,6 +239,35 @@ function App() {
               onChange={() => setEnterLeft((x: boolean) => !x)}
             />
             <label htmlFor="enter-left-setting">"Enter" on left side</label>
+          </div>
+        </div>
+      )}
+
+      {/* Timer duration popup */}
+      {showDurationPopup && (
+        <div className="popup-overlay">
+          <div className="popup-box">
+            <h3>Choose Timer Duration</h3>
+            {[3, 5, 10].map((min) => (
+              <button
+                key={min}
+                onClick={() => {
+                  setTimerDuration(min);
+                  setShowDurationPopup(false);
+                }}
+              >
+                {min} min
+              </button>
+            ))}
+            <button
+              className="cancel-button"
+              onClick={() => {
+                setTimerEnabled(false);
+                setShowDurationPopup(false);
+              }}
+            >
+              Cancel
+            </button>
           </div>
         </div>
       )}

@@ -201,9 +201,13 @@ function Game(props: GameProps) {
       if (currentGuess === target) {
         setHint(gameOver("won"));
         setGameState(GameState.Won);
+        document.body.style.backgroundColor = "lightgreen";
+        document.body.style.color = "forestgreen";
       } else if (guesses.length + 1 === props.maxGuesses) {
         setHint(gameOver("lost"));
         setGameState(GameState.Lost);
+        document.body.style.backgroundColor = "rgb(255, 100, 100)";
+        document.body.style.color = "maroon";
       } else {
         setHint("");
         speak(describeClue(clue(currentGuess, target)));
